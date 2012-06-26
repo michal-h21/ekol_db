@@ -138,14 +138,14 @@ setlocale(LC_ALL, 'cs_CZ');
 DB::$user = 'root';
 DB::$password = 'mint';
 DB::$dbName = 'bibeko';
-DB::query("SET NAMES 'utf8'");
+DB::$encoding = 'utf8';
 
 foreach(array_unique($id,SORT_STRING) as $j){
         //mysql_query("insert into journal (title) values ('".mysql_escape_string($j)."')") or  die (mysql_error());
 	echo $j."\n";
 }
 
-$result = DB::query("SELECT * FROM journal WHERE match (title) against('eko* envi*' IN BOOLEAN MODE);");
+$result = DB::query("SELECT * FROM journal WHERE match (title) against('eko* envi* bedrník' IN BOOLEAN MODE);");
 /*echo mysql_numrows($result)."\n";
 while ($row = mysql_fetch_array($result, MYSQL_NUM)) {
     printf("ID: %s  Name: %s\n", $row[0], $row[1]);  
