@@ -7,6 +7,7 @@
 //require('./iso2709.inc.php');
 
 require_once 'meekrodb.2.0.class.php';
+require_once 'inserter.php';
 
 class isoRecord{
       var $fields=array();
@@ -70,6 +71,14 @@ class isoRecord{
         else 
           return false; 
       }
+      function getFieldOrNull($field){
+         if(isset($this->fields[$field]) && is_array($this->fields[$field]))
+            return array_shift($this->fields[$field]);
+         else if(isset($this->fields[$field]))
+            return $this->fields[$field];
+         else
+            return null;     
+      }
       function cleanNumbers($s){
          return iconv('CP852','UTF-8',str_replace(array("\n","\r",'
 '),'',$s));
@@ -105,6 +114,9 @@ $i=0;
 //$zaznamy=array_slice($zaznamy,0,10);
 //print_r($p);
 $id=array();
+$authors=array();
+//$journals = array();
+$issues = array();
 foreach($zaznamy as $zaznam0){
 //   foreach(explode("#",$zaznam) as $radek){
 //     $zaznam=str_replace("\n",'',$radek);                           
@@ -113,10 +125,15 @@ foreach($zaznamy as $zaznam0){
 //   }
   $rec=new isoRecord($zaznam0);
   if($rec->getField("source")){
-	  $journal= array_shift($rec->getField("source"));
-	 // $volume = array_shift($rec->getField("volume"));
-	 // $issue =array_shift($rec->getField("number"));
+	  $journal= $rec->getFieldOrNull("source");
+	  $volume = $rec->getFieldOrNull("volume");
+	  $number =$rec->getFieldOrNull("number");
+          $year = array_shift($rec->getField("year"));
+          $hash=JournalIssue::getUri($journal,$volume,$number);
+          array_push($issues,array($hash=>array("year"=>$year,"volume"=>$volume,"journal"=>$journal,"number"=>$number)));   
 	  array_push($id,$journal);
+         if(is_array($rec->getField("author")))
+            foreach($rec->getField("author") as $aut)array_push($authors,$aut);
   }else{
   	$rec->pretyPrint();  
   }
@@ -152,8 +169,15 @@ while ($row = mysql_fetch_array($result, MYSQL_NUM)) {
 }
 */
 foreach($result as $row){
-  printf("ID: %s  Name: %s\n", $row["journal_id"], $row["title"]);
+  printf("ID: %s  Name: %s\n", $row["id"], $row["title"]);
 }
+$journals = new Inserter("journal","title",array_unique($id,SORT_STRING));
+//print_r($ins->getItems());
+
+$ins = new Inserter("author","name",array_unique($authors,SORT_STRING));
+//print_r($ins->getItems());
+$issue_table = new Issues($journals->getItems(),$issues);
+//print_r($issue_table->getItems());
 ?>
 </table>
 </body>
