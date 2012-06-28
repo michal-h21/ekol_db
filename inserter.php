@@ -30,6 +30,9 @@ class Inserter{
    function getItems(){
       return $this->items;
    }
+   function getId($hash){
+      return $this->items[$hash];
+   }
 }
 
 class Issues extends Inserter{
@@ -38,12 +41,12 @@ class Issues extends Inserter{
        foreach($ble as $h=>$j){
           if(!isset($this->items[$h])){
              $journal_id = $journals[$j["journal"]];
-             $res=DB::query("SELECT id FROM issue WHERE number = %s AND year = %i AND volume = %i AND journal_id = %i",$j["number"],$j["year"],$j["volume"],$journal_id);
+             $res=DB::query("SELECT id FROM issue WHERE number = %s AND year = %i AND volume = %i AND journal_id = %i AND comment=%s",$j["number"],$j["year"],$j["volume"],$journal_id,$j["comment"]);
              if(DB::count()==0){
-               DB::insertIgnore("issue",array("volume"=>$j["volume"],"year"=>$j["year"],"number"=>$j["number"],"journal_id"=>$journal_id));
+               DB::insertIgnore("issue",array("volume"=>$j["volume"],"year"=>$j["year"],"number"=>$j["number"],"journal_id"=>$journal_id,"comment"=>$j["comment"]));
                $this->items[$h]=DB::insertId();
              }else{
-               //$this->items[$h] = DB::queryFirstField(); 
+               foreach($res as $row)$this->items[$h] = $row["id"]; 
              }  
              //echo $h ." : ".$hash."\n";*/
           }  
@@ -51,4 +54,42 @@ class Issues extends Inserter{
    }
 }
 
+class Articles extends Inserter{
+  function __construct($articles,$authors,$issues){
+     foreach($articles as $a){
+        $issue_id=$issues->getId($a["hash"]);
+        $h=ArticleHash::getUri($a["title"],$a["pages"],$issue_id);
+       $res=DB::query("SELECT id FROM article WHERE title_hash=%i AND pages=%s AND issue_id=%i",crc32($a["title"]),$a["pages"],$issue_id);
+        if(DB::count()==0){
+          DB::insertIgnore("article",array("title"=>$a["title"],"abstract"=>$a["abstract"],"title_hash"=>crc32($a["title"]),"pages"=>$a["pages"],"issue_id"=>$issue_id));
+          $this->items[$h] = DB::insertId();
+          echo "Inserting {$a['title']} - {$a['pages']}\n";
+          $curr_id=$this->getId($h);
+          if(is_array($a["authors"]))foreach($a["authors"] as $author)DB::insertIgnore("article_author",array("article_id"=>$curr_id,"author_id"=>$authors->getId($author)));
+        }else{
+           foreach($res as $row)$this->items[$h] = $row["id"]; 
+        }
+        $curr_id=$this->getId($h);
+        if(!$curr_id)echo "Nemám id od {$a['title']} - {$a['pages']}";
+     }  
+  }
+}
+
+class Hash{
+  function getHash($s){
+      return iconv("UTF-8","ASCII//TRANSLIT",mb_strtolower($s,'UTF-8'));
+  }
+}
+
+class JournalIssue extends Hash{
+  function getUri($journal,$vol,$issue,$comment=""){
+     return parent::getHash($journal) . "_{$vol}_$issue:$comment";
+  }
+}
+
+class ArticleHash extends Hash{
+  function getUri($title,$pages,$issue){
+    return crc32($title)."_".$pages."_".$issue;
+  }
+}
 ?>

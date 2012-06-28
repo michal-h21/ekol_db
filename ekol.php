@@ -93,17 +93,7 @@ function findAuthor(&$arr,$pos){
 }
 
 
-class Hash{
-  function getHash($s){
-      return iconv("UTF-8","ASCII//TRANSLIT",mb_strtolower($s,'UTF-8'));
-  }
-}
 
-class JournalIssue extends Hash{
-  function getUri($journal,$vol,$issue){
-     return parent::getHash($journal) . "_{$vol}_$issue";
-  }
-}
 
 $test="EKO07.ISO";
 $zaznamy=explode("##",file_get_contents($test));
@@ -117,6 +107,7 @@ $id=array();
 $authors=array();
 //$journals = array();
 $issues = array();
+$articles = array();
 foreach($zaznamy as $zaznam0){
 //   foreach(explode("#",$zaznam) as $radek){
 //     $zaznam=str_replace("\n",'',$radek);                           
@@ -127,11 +118,22 @@ foreach($zaznamy as $zaznam0){
   if($rec->getField("source")){
 	  $journal= $rec->getFieldOrNull("source");
 	  $volume = $rec->getFieldOrNull("volume");
-	  $number =$rec->getFieldOrNull("number");
+	  $number = explode(",",$rec->getFieldOrNull("number"));
+          $comment=""; 
+          if(count($number)>1){
+             $comment=trim($number[1]);
+             $number=trim($number[0]); 
+          }else{
+             $number=trim(array_shift($number));  
+          }
+          $pages= $rec->getFieldOrNull("pages"); 
+          $title = $rec->getFieldOrNull("title");
+          $abstract = $rec->getFieldOrNull("annotation");
           $year = array_shift($rec->getField("year"));
-          $hash=JournalIssue::getUri($journal,$volume,$number);
-          array_push($issues,array($hash=>array("year"=>$year,"volume"=>$volume,"journal"=>$journal,"number"=>$number)));   
+          $hash=JournalIssue::getUri($journal,$volume,$number,$comment);
+          array_push($issues,array($hash=>array("year"=>$year,"volume"=>$volume,"journal"=>$journal,"number"=>$number,"comment"=>$comment)));   
 	  array_push($id,$journal);
+          array_push($articles,array("hash"=>$hash,"pages"=>$pages,"title"=>$title,"abstract"=>$abstract,"authors"=>$rec->getField("author")));
          if(is_array($rec->getField("author")))
             foreach($rec->getField("author") as $aut)array_push($authors,$aut);
   }else{
@@ -162,22 +164,28 @@ foreach(array_unique($id,SORT_STRING) as $j){
 	echo $j."\n";
 }
 
-$result = DB::query("SELECT * FROM journal WHERE match (title) against('eko* envi* bedrník' IN BOOLEAN MODE);");
+$result = DB::query("SELECT * FROM journal WHERE match (journal) against('eko* envi* bedrník' IN BOOLEAN MODE);");
 /*echo mysql_numrows($result)."\n";
 while ($row = mysql_fetch_array($result, MYSQL_NUM)) {
     printf("ID: %s  Name: %s\n", $row[0], $row[1]);  
 }
 */
 foreach($result as $row){
-  printf("ID: %s  Name: %s\n", $row["id"], $row["title"]);
+  printf("ID: %s  Name: %s\n", $row["id"], $row["journal"]);
 }
-$journals = new Inserter("journal","title",array_unique($id,SORT_STRING));
+$journals = new Inserter("journal","journal",array_unique($id,SORT_STRING));
 //print_r($ins->getItems());
 
-$ins = new Inserter("author","name",array_unique($authors,SORT_STRING));
+$authors = new Inserter("author","name",array_unique($authors,SORT_STRING));
 //print_r($ins->getItems());
 $issue_table = new Issues($journals->getItems(),$issues);
+$art=new Articles($articles,$authors,$issue_table);
 //print_r($issue_table->getItems());
+$search = "ekol*";
+$res=DB::query("SELECT a.title, j.journal, au.name FROM article AS a LEFT JOIN issue AS i ON a.issue_id = i.id LEFT JOIN journal AS j ON i.journal_id = j.id LEFT JOIN article_author AS a_u ON a.id = a_u.article_id LEFT JOIN author AS au ON a_u.author_id= au.id WHERE MATCH a.title AGAINST (%s In BOOLEAN MODE) OR MATCH a.abstract AGAINST (%s)",$search,$search);
+foreach($res as $row){
+  print_r($row);
+}
 ?>
 </table>
 </body>
