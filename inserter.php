@@ -22,7 +22,7 @@ class Inserter{
       foreach($values as $val){
          if(!isset($this->items[$val])){
            echo "Inserting $val\n";
-           DB::insert($this->table,array("id"=>0,"name"=>$val));
+           DB::insert($this->table,array("id"=>0,$this->column=>$val));
            $this->items[$val]=DB::insertId();
          }
       }
@@ -53,6 +53,7 @@ class Issues extends Inserter{
        }}
    }
 }
+
 
 class Articles extends Inserter{
   function __construct($articles,$authors,$issues){
@@ -90,6 +91,27 @@ class JournalIssue extends Hash{
 class ArticleHash extends Hash{
   function getUri($title,$pages,$issue){
     return crc32($title)."_".$pages."_".$issue;
+  }
+}
+
+class RecList{
+  var $column="";
+  var $table="";
+  var $values=array();
+  function __construct($table,$column){
+     $this->table=$table;
+     $this->column=$column;
+  }
+  function add($val){
+    if(is_array($val))foreach($val as $v){
+       array_push($this->values,$v);
+     }
+    else
+       array_push($this->values,$val);
+  } 
+  function getInserter(){
+     // echo "new Inserter({$this->table},{$this->column},array_unique($this->values,SORT_STRING))\n";
+     return new Inserter($this->table,$this->column,array_unique($this->values,SORT_STRING));
   }
 }
 ?>

@@ -9,8 +9,10 @@
 require_once 'meekrodb.2.0.class.php';
 require_once 'inserter.php';
 
+
 class isoRecord{
       var $fields=array();
+      var $encoding="CP852";
       var $header;
       var $directory=array();
       var $records=array();
@@ -31,6 +33,9 @@ class isoRecord{
           "780"=>"kody_obsahu",
           "790"=>"kody_vyuziti"
       );
+      function setEncoding($enc){
+         $this->encoding=$enc;
+      }
       function isoRecord($recordString){
           $this->records=explode('#',$recordString);
           $metadata=$this->cleanNumbers($this->records[0]);
@@ -80,7 +85,7 @@ class isoRecord{
             return null;     
       }
       function cleanNumbers($s){
-         return iconv('CP852','UTF-8',str_replace(array("\n","\r",'
+         return iconv($this->encoding,'UTF-8',str_replace(array("\n","\r",'
 '),'',$s));
       }
 }
@@ -95,7 +100,9 @@ function findAuthor(&$arr,$pos){
 
 
 
-$test="EKO07.ISO";
+//$test="EKO07.ISO";
+$test="envir.iso";
+$encoding="UTF-8";
 $zaznamy=explode("##",file_get_contents($test));
 echo count($zaznamy);
 //$zaznam=$zaznamy[1];
@@ -108,6 +115,12 @@ $authors=array();
 //$journals = array();
 $issues = array();
 $articles = array();
+$keywords_cs = new RecList("keyword_cs","keyword_cs");
+$keywords_en = new RecList("keyword_en","keyword_en");
+$kody_vyuziti = new RecList("use_code","use_code");
+$kody_obsahu = new RecList("content_code","content_code");
+$kody_ministerstva = new RecList("ministry_code","ministry_code");
+
 foreach($zaznamy as $zaznam0){
 //   foreach(explode("#",$zaznam) as $radek){
 //     $zaznam=str_replace("\n",'',$radek);                           
@@ -115,6 +128,7 @@ foreach($zaznamy as $zaznam0){
 //     $i++;
 //   }
   $rec=new isoRecord($zaznam0);
+  $rec->setEncoding($encoding);
   if($rec->getField("source")){
 	  $journal= $rec->getFieldOrNull("source");
 	  $volume = $rec->getFieldOrNull("volume");
@@ -129,6 +143,11 @@ foreach($zaznamy as $zaznam0){
           $pages= $rec->getFieldOrNull("pages"); 
           $title = $rec->getFieldOrNull("title");
           $abstract = $rec->getFieldOrNull("annotation");
+          $keywords_cs->add(explode(" ",$rec->getFieldOrNull("keywords_cs")));
+          $keywords_en->add(explode(" ",$rec->getFieldOrNull("keywords_en")));
+          $kody_vyuziti->add($rec->getFieldOrNull("kody_vyuziti"));
+          $kody_obsahu->add($rec->getFieldOrNull("kody_obsahu"));
+          $kody_ministerstva->add($rec->getFieldOrNull("kody_ministerstva"));
           $year = array_shift($rec->getField("year"));
           $hash=JournalIssue::getUri($journal,$volume,$number,$comment);
           array_push($issues,array($hash=>array("year"=>$year,"volume"=>$volume,"journal"=>$journal,"number"=>$number,"comment"=>$comment)));   
@@ -186,6 +205,11 @@ $res=DB::query("SELECT a.title, j.journal, au.name FROM article AS a LEFT JOIN i
 foreach($res as $row){
   print_r($row);
 }
+$k_cs = $keywords_cs->getInserter();
+$keywords_en->getInserter();
+$kody_vyuziti->getInserter();
+$kody_obsahu->getInserter();
+$kody_ministerstva->getInserter();
 ?>
 </table>
 </body>
